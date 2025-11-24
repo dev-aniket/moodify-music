@@ -9,7 +9,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173", // Keep this for local development
-  "https://moodify-frontend-three.vercel.app/" 
+  "https://moodify-frontend-three.vercel.app" 
 ];
 
 app.use(cors({
