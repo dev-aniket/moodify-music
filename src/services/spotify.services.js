@@ -1,5 +1,5 @@
 import axios from 'axios';
-import config from '../config/config.js'; // Import your central config
+import config from '../config/config.js';
 
 const CLIENT_ID = config.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = config.SPOTIFY_CLIENT_SECRET;
@@ -15,6 +15,7 @@ async function getAccessToken() {
     const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
     
     try {
+        // FIX 1: Use the REAL Spotify Token URL
         const response = await axios.post('https://accounts.spotify.com/api/token', 
             new URLSearchParams({ grant_type: 'client_credentials' }), {
             headers: {
@@ -45,27 +46,29 @@ export async function getSpotifyRecommendations(mood) {
         const features = MOOD_MAP[mood] || MOOD_MAP.neutral;
         const seed_genres = "pop,rock,indie,r-n-b,acoustic"; 
 
+        // FIX 2: Use the REAL Spotify API URL
         const response = await axios.get('https://api.spotify.com/v1/recommendations', {
             headers: { Authorization: `Bearer ${token}` },
             params: {
                 seed_genres,
                 limit: 10, 
-                market: 'US', 
+                market: 'IN', // 'IN' is good if you are in India
                 ...features
             }
         });
 
-        return response.data.tracks
-            .filter(t => t.preview_url) 
-            .map(track => ({
-                id: track.id,
-                title: track.name,
-                artist: track.artists[0].name,
-                coverImageUrl: track.album.images[0]?.url || '',
-                musicUrl: track.preview_url, 
-                mood: mood,
-                source: 'spotify' 
-            }));
+        // FIX 3: REMOVE the .filter()
+        // Spotify often returns null preview_urls for new apps. 
+        // We return the songs anyway so the UI doesn't look empty.
+        return response.data.tracks.map(track => ({
+            id: track.id,
+            title: track.name,
+            artist: track.artists[0].name,
+            coverImageUrl: track.album.images[0]?.url || '',
+            musicUrl: track.preview_url, // This might be null, handled in UI
+            mood: mood,
+            source: 'spotify' 
+        }));
 
     } catch (err) {
         console.error(`Spotify Fetch Error (${mood}):`, err.response?.data || err.message);
