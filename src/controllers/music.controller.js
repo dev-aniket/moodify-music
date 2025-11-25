@@ -1,30 +1,37 @@
 import { uploadFile, getPresignedUrl } from "../services/storage.services.js";
 import musicModel from "../models/music.model.js";
 import playlistModel from "../models/playlist.model.js";
+import { getSpotifyRecommendations } from "../services/spotify.services.js";
 
 export async function uploadMusic(req, res) {
+    // SAFETY CHECK
+    if (!req.files || !req.files['music'] || !req.files['coverImage']) {
+        return res.status(400).json({ message: 'Music and Cover Image are required' });
+    }
 
-    const musicFile = req.files[ 'music' ][ 0 ];
-    const coverImageFile = req.files[ 'coverImage' ][ 0 ];
-
+    const musicFile = req.files['music'][0];
+    const coverImageFile = req.files['coverImage'][0];
+    
+    // Extract mood from body (default to neutral if missing)
+    const { title, mood = 'neutral' } = req.body;
 
     try {
-
         const musicKey = await uploadFile(musicFile);
         const coverImageKey = await uploadFile(coverImageFile);
 
         const music = await musicModel.create({
-            title: req.body.title,
-            artist: req.user.fullname.firstName + " " + req.user.fullname.lastName,
+            title: title,
+            artist: req.user.fullname ? `${req.user.fullname.firstName} ${req.user.fullname.lastName}` : "Unknown Artist",
             artistId: req.user.id,
             musicKey,
-            coverImageKey
+            coverImageKey,
+            mood: mood.toLowerCase() // Save the mood
         })
 
         return res.status(201).json({ message: 'Music uploaded successfully', music });
 
     } catch (err) {
-        console.log(err)
+        console.log("Upload Error:", err);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
@@ -34,16 +41,17 @@ export async function getAllMusic(req, res){
 
     try{
          const musicsDocs = await musicModel.find().skip(skip).limit(limit).lean();
+         
+         const musics = await Promise.all(musicsDocs.map(async (music) => {
+            return {
+                ...music,
+                musicUrl: await getPresignedUrl(music.musicKey),
+                coverImageUrl: await getPresignedUrl(music.coverImageKey),
+                mood: music.mood || 'neutral' // Return mood (fallback to neutral)
+            };
+         }));
 
-        const musics = [];
-
-        for (let music of musicsDocs) {
-            music.musicUrl = await getPresignedUrl(music.musicKey);
-            music.coverImageUrl = await getPresignedUrl(music.coverImageKey);
-            musics.push(music);
-        }
-
-        return res.status(200).json({ message:"Musics fetched successfully",musics });
+        return res.status(200).json({ message:"Musics fetched successfully", musics });
     }
     catch(err){
         console.log(err);
@@ -75,13 +83,14 @@ export async function getArtistMusics(req, res) {
     try {
         const musicsDocs = await musicModel.find({ artistId: req.user.id }).lean();
 
-        const musics = [];
-
-        for (let music of musicsDocs) {
-            music.musicUrl = await getPresignedUrl(music.musicKey);
-            music.coverImageUrl = await getPresignedUrl(music.coverImageKey);
-            musics.push(music);
-        }
+        const musics = await Promise.all(musicsDocs.map(async (music) => {
+            return {
+                ...music,
+                musicUrl: await getPresignedUrl(music.musicKey),
+                coverImageUrl: await getPresignedUrl(music.coverImageKey),
+                mood: music.mood || 'neutral'
+            };
+         }));
 
         return res.status(200).json({ musics });
     } catch (err) {
@@ -110,10 +119,10 @@ export async function createPlaylist(req, res) {
     }
 }
 
-
+// Logic Fix: Return ALL playlists for Home Page discovery
 export async function getPlaylists(req, res) {
     try {
-        const playlists = await playlistModel.find({ artistId: req.user.id })
+        const playlists = await playlistModel.find({}); 
         return res.status(200).json({ playlists });
     } catch (err) {
         console.log(err);
@@ -151,10 +160,33 @@ export async function getPlaylistById(req, res){
     }
 }
 
+// Logic Fix: Return ONLY artist playlists for Dashboard
 export async function getArtistPlaylist(req, res) {
     try {
         const playlists = await playlistModel.find({ artistId: req.user.id })
         return res.status(200).json({ playlists });
+    } catch (err) {
+        console.log(err);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+export async function getMoodHome(req, res) {
+    try {
+        // Fetch all 4 moods in parallel
+        const [happy, sad, angry, neutral] = await Promise.all([
+            getSpotifyRecommendations('happy'),
+            getSpotifyRecommendations('sad'),
+            getSpotifyRecommendations('angry'),
+            getSpotifyRecommendations('neutral')
+        ]);
+
+        return res.status(200).json({
+            happy,
+            sad,
+            angry,
+            neutral
+        });
     } catch (err) {
         console.log(err);
         return res.status(500).json({ message: 'Internal server error' });

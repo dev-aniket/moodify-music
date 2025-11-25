@@ -9,32 +9,42 @@ const upload = multer({
     storage: multer.memoryStorage()
 });
 
-/* POST /api/music/upload */
+/* --- UPLOADS (Keep Protected) --- */
 router.post('/upload', authMiddleware.authArtistMiddleware, upload.fields([
     { name: 'music', maxCount: 1 },
     { name: 'coverImage', maxCount: 1 }
 ]), musicController.uploadMusic)
 
-// GET /api/music 
-router.get('/', authMiddleware.authUserMiddleware, musicController.getAllMusic);
+
+/* --- PUBLIC ROUTES (Middleware Removed) --- */
+
+// 1. Get All Music (Home Page Community) - PUBLIC
+router.get('/', musicController.getAllMusic);
+
+// 2. Get Spotify Moods (Home Page Spotify) - PUBLIC
+router.get('/spotify/home', musicController.getMoodHome);
+
+// 3. Get Playlists (Home Page) - PUBLIC
+router.get('/playlists', musicController.getPlaylists);
+
+// 4. Get specific details - PUBLIC
+router.get('/playlist/:id', musicController.getPlaylistById)
 
 
-router.get('/get-details/:id', authMiddleware.authArtistMiddleware, musicController.getMusicById)
+/* --- PROTECTED ROUTES (Keep Protected) --- */
 
-//  GET /api/music/artist-musics 
+// Artist specific stats
 router.get('/artist-musics', authMiddleware.authArtistMiddleware, musicController.getArtistMusics)
 
-// POST /api/music/playlist
+// Create Playlist
 router.post('/playlist', authMiddleware.authArtistMiddleware, musicController.createPlaylist);
 
-// GET /api/music/playlist/artist 
+// Artist specific playlists
 router.get('/playlist/artist', authMiddleware.authUserMiddleware, musicController.getArtistPlaylist)
 
-//GET /api/music/playlists
-router.get('/playlists', authMiddleware.authUserMiddleware, musicController.getPlaylists)
-
-//GET /api/music/playlist/:id
-router.get('/playlist/:id', authMiddleware.authUserMiddleware, musicController.getPlaylistById)
-
+// Get music details (used in player) - Keep public or protected? 
+// Let's make it Protected only if you want only users to listen, 
+// BUT for now, let's allow public so the player works:
+router.get('/get-details/:id', musicController.getMusicById) 
 
 export default router;
