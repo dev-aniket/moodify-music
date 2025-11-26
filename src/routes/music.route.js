@@ -22,6 +22,10 @@ router.post('/upload', authMiddleware.authArtistMiddleware, upload.fields([
 router.get('/', musicController.getAllMusic);
 
 // 2. Get Spotify Moods (Home Page Spotify) - PUBLIC
+
+router.get("/spotify/test", musicController.testSpotify);
+
+
 router.get('/spotify/home', musicController.getMoodHome);
 
 // 3. Get Playlists (Home Page) - PUBLIC

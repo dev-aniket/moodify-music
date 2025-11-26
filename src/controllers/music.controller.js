@@ -2,6 +2,9 @@ import { uploadFile, getPresignedUrl } from "../services/storage.services.js";
 import musicModel from "../models/music.model.js";
 import playlistModel from "../models/playlist.model.js";
 import { getSpotifyRecommendations } from "../services/spotify.services.js";
+import axios from "axios";
+
+
 
 export async function uploadMusic(req, res) {
     // SAFETY CHECK
@@ -172,8 +175,9 @@ export async function getArtistPlaylist(req, res) {
 }
 
 export async function getMoodHome(req, res) {
+    console.log("🔥 HIT: /spotify/home");
+
     try {
-        // Fetch all 4 moods in parallel
         const [happy, sad, angry, neutral] = await Promise.all([
             getSpotifyRecommendations('happy'),
             getSpotifyRecommendations('sad'),
@@ -181,14 +185,32 @@ export async function getMoodHome(req, res) {
             getSpotifyRecommendations('neutral')
         ]);
 
+        console.log("🔥 SPOTIFY RESULT:", {
+            happy: happy.length,
+            sad: sad.length,
+            angry: angry.length,
+            neutral: neutral.length
+        });
+
         return res.status(200).json({
-            happy,
-            sad,
-            angry,
-            neutral
+            happy, sad, angry, neutral
         });
     } catch (err) {
-        console.log(err);
+        console.log("🔥 ERROR:", err);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+
+
+
+export async function testSpotify(req, res) {
+  try {
+    const r = await axios.get("https://api.spotify.com/v1");
+    return res.json({ success: true, data: r.data });
+  } catch (err) {
+    console.log("🔥 OUTBOUND TEST ERROR:", err.code, err.message);
+    return res.json({ success: false, error: err.code });
+  }
+}
+

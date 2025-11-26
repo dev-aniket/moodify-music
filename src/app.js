@@ -6,6 +6,11 @@ import cors from 'cors'
 
 const app = express();
 
+app.use((req, res, next) => {
+    console.log(`🔔 HIT: ${req.method} ${req.url}`);
+    next();
+});
+
 
 const allowedOrigins = [
   "http://localhost:5173", // Keep this for local development
