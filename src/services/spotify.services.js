@@ -8,14 +8,16 @@ let spotifyToken = null;
 let tokenExpiration = 0;
 
 async function getAccessToken() {
+    // Return cached token if valid
     if (spotifyToken && Date.now() < tokenExpiration) {
         return spotifyToken;
     }
 
+    console.log("🔄 Getting new Spotify Token...");
     const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
     
     try {
-        // FIX 1: Use the REAL Spotify Token URL
+        // ✅ CORRECT URL: Spotify Accounts Service
         const response = await axios.post('https://accounts.spotify.com/api/token', 
             new URLSearchParams({ grant_type: 'client_credentials' }), {
             headers: {
@@ -26,52 +28,64 @@ async function getAccessToken() {
 
         spotifyToken = response.data.access_token;
         tokenExpiration = Date.now() + ((response.data.expires_in - 60) * 1000);
+        console.log("✅ Spotify Token Acquired!");
         return spotifyToken;
     } catch (err) {
-        console.error("Spotify Auth Error:", err.response?.data || err.message);
+        console.error("❌ Spotify Auth Failed:", err.response?.data || err.message);
         throw new Error("Failed to connect to Spotify");
     }
 }
 
-const MOOD_MAP = {
-    happy: { min_valence: 0.7, min_energy: 0.6 },
-    sad: { max_valence: 0.4, max_energy: 0.4 },
-    angry: { max_valence: 0.4, min_energy: 0.7 },
-    neutral: { min_valence: 0.4, max_valence: 0.6, max_energy: 0.5 }
-};
-
+// -------------------- updated getSpotifyRecommendations --------------------
 export async function getSpotifyRecommendations(mood) {
     try {
         const token = await getAccessToken();
-        const features = MOOD_MAP[mood] || MOOD_MAP.neutral;
-        const seed_genres = "pop,rock,indie,r-n-b,acoustic"; 
 
-        // FIX 2: Use the REAL Spotify API URL
+        const GENRE_MAP = {
+            happy: "pop",
+            sad: "acoustic",
+            angry: "rock",
+            neutral: "ambient"
+        };
+        const seed_genres = GENRE_MAP[mood] || "pop";
+
+        console.log(`🔎 Querying Spotify recommendations for mood=${mood}, seed_genres=${seed_genres}...`);
+
+        // Use Recommendations endpoint (seed_genres) instead of search with genre:...
         const response = await axios.get('https://api.spotify.com/v1/recommendations', {
             headers: { Authorization: `Bearer ${token}` },
             params: {
-                seed_genres,
-                limit: 10, 
-                market: 'IN', // 'IN' is good if you are in India
-                ...features
+                seed_genres: seed_genres,
+                limit: 12,
+                market: 'US'
             }
         });
 
-        // FIX 3: REMOVE the .filter()
-        // Spotify often returns null preview_urls for new apps. 
-        // We return the songs anyway so the UI doesn't look empty.
-        return response.data.tracks.map(track => ({
-            id: track.id,
-            title: track.name,
-            artist: track.artists[0].name,
-            coverImageUrl: track.album.images[0]?.url || '',
-            musicUrl: track.preview_url, // This might be null, handled in UI
-            mood: mood,
-            source: 'spotify' 
-        }));
+        // Debug log entire response shape so you can inspect it in server logs
+        console.log('SPOTIFY RECOMMENDATIONS RESPONSE (partial):', {
+            seeds: response.data.seeds?.map(s => s.id),
+            tracks_count: response.data.tracks?.length
+        });
 
+        const tracks = response.data.tracks || [];
+        console.log(`✅ Spotify returned ${tracks.length} recommended tracks for ${mood}`);
+
+        return tracks.map(track => ({
+            id: track.id,
+            title: track.name || 'Unknown title',
+            artist: track.artists && track.artists[0] ? track.artists[0].name : 'Unknown artist',
+            coverImageUrl: (track.album && track.album.images && track.album.images[0]) ? track.album.images[0].url : '',
+            musicUrl: track.preview_url || null,
+            mood,
+            source: 'spotify'
+        }));
     } catch (err) {
-        console.error(`Spotify Fetch Error (${mood}):`, err.response?.data || err.message);
+        // print full error so you can see status / message in server logs
+        console.error(`❌ getSpotifyRecommendations error for mood=${mood}:`, {
+            message: err.message,
+            status: err.response?.status,
+            data: err.response?.data
+        });
         return [];
     }
 }
