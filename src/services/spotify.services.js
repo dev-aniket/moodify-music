@@ -4,9 +4,9 @@ import config from '../config/config.js';
 const CLIENT_ID = config.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = config.SPOTIFY_CLIENT_SECRET;
 
-// 👇 SPLITTING STRINGS TO PREVENT AUTO-REPLACEMENT ERRORS 👇
-const SPOTIFY_TOKEN_URL = "https://" + "accounts.spotify.com" + "/api/token";
-const SPOTIFY_SEARCH_URL = "https://" + "api.spotify.com" + "/v1/search";
+// OFFICIAL URLS 
+const SPOTIFY_TOKEN_URL = "https://" + "accounts.spotify.com/api/token";
+const SPOTIFY_SEARCH_URL = "https://" + "api.spotify.com/v1/search";
 
 let spotifyToken = null;
 let tokenExpiration = 0;
@@ -20,7 +20,6 @@ async function getAccessToken() {
     const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
     
     try {
-        // Using the constructed variable
         const response = await axios.post(SPOTIFY_TOKEN_URL, 
             new URLSearchParams({ grant_type: 'client_credentials' }), {
             headers: {
@@ -42,32 +41,33 @@ async function getAccessToken() {
 export async function getSpotifyRecommendations(mood) {
     try {
         const token = await getAccessToken();
-        
-        // Simple text search guarantees results
         const searchQuery = mood; 
 
         console.log(`🔎 Searching Spotify for: "${searchQuery}"...`);
 
-        // Using the constructed variable
         const response = await axios.get(SPOTIFY_SEARCH_URL, {
             headers: { Authorization: `Bearer ${token}` },
             params: {
                 q: searchQuery, 
                 type: 'track',
-                limit: 10
-                // Removed 'market' to allow global availability
+                limit: 18,   // Request 10 songs
+                market: 'IN' 
             }
         });
 
-        const tracks = response.data.tracks.items;
-        console.log(`✅ Spotify returned ${tracks.length} tracks for ${mood}`);
+        const allTracks = response.data.tracks.items;
+        
+        const validTracks = allTracks; 
 
-        return tracks.map(track => ({
+        console.log(`✅ Spotify returned ${validTracks.length} tracks for ${mood}`);
+
+        return validTracks.map(track => ({
             id: track.id,
             title: track.name,
             artist: track.artists[0].name,
             coverImageUrl: track.album.images[0]?.url || '',
-            musicUrl: track.preview_url, 
+            musicUrl: track.preview_url, // Might be null (handled by frontend)
+            externalUrl: track.external_urls.spotify, // Link to open App
             mood: mood,
             source: 'spotify' 
         }));
