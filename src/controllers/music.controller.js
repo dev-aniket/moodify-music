@@ -103,21 +103,22 @@ export async function getArtistMusics(req, res) {
 }
 
 export async function createPlaylist(req, res) {
-    const { title, musics } = req.body;
+    // Frontend now sends 'songs', not 'musics'
+    const { title, songs } = req.body; 
 
     try {
         const playlist = await playlistModel.create({
+            // Use the logged-in user's name
             artist: req.user.fullname.firstName + " " + req.user.fullname.lastName,
             artistId: req.user.id,
             title,
-            userId: req.user.id,
-            musics
+            songs // Save the array of song objects directly
         })
 
         return res.status(201).json({ message: 'Playlist created successfully', playlist });
 
     } catch (err) {
-        console.log(err)
+        console.log("Create Playlist Error:", err);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
@@ -143,18 +144,9 @@ export async function getPlaylistById(req, res){
             return res.status(404).json({ message: 'Playlist not found' });
         }
 
-        const musics = []
-
-        for (let musicId of playlistDoc.musics) {
-            const music = await musicModel.findById(musicId).lean();
-            if (music) {
-                music.musicUrl = await getPresignedUrl(music.musicKey);
-                music.coverImageUrl = await getPresignedUrl(music.coverImageKey);
-                musics.push(music);
-            }
-        }
-
-        playlistDoc.musics = musics;
+        // Map 'songs' to 'musics' for backward compatibility with your frontend list
+        // Your PlaylistDetails.jsx likely expects 'musics'
+        playlistDoc.musics = playlistDoc.songs || [];
 
         return res.status(200).json({ playlist: playlistDoc });
     } catch (err) {

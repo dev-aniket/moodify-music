@@ -41,7 +41,9 @@ router.get('/playlist/:id', musicController.getPlaylistById)
 router.get('/artist-musics', authMiddleware.authArtistMiddleware, musicController.getArtistMusics)
 
 // Create Playlist
-router.post('/playlist', authMiddleware.authArtistMiddleware, musicController.createPlaylist);
+router.post('/playlist', authMiddleware.authUserMiddleware, musicController.createPlaylist);
+
+// ... rest of file
 
 // Artist specific playlists
 router.get('/playlist/artist', authMiddleware.authUserMiddleware, musicController.getArtistPlaylist)
